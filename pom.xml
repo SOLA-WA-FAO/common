@@ -5,13 +5,12 @@
     <parent>
         <artifactId>sola-admin-main</artifactId>
         <groupId>org.fao.sola.admin</groupId>
-        <version>1504a</version>
+        <version>2006a</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
     <groupId>org.fao.sola.admin.common</groupId>
     <artifactId>sola-admin-common</artifactId>
     <packaging>jar</packaging>
-    <version>1504a</version>
     <name>Common Admin Utilities</name>
     <build>
         <plugins>
