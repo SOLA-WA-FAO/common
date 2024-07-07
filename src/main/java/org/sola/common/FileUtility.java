@@ -29,33 +29,16 @@
  */
 package org.sola.common;
 
-import com.sun.istack.ByteArrayDataSource;
-import com.sun.pdfview.PDFFile;
-import com.sun.pdfview.PDFPage;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import javax.activation.DataHandler;
-import javax.activation.FileDataSource;
-import javax.swing.ImageIcon;
+import jakarta.activation.DataHandler;
+import jakarta.activation.FileDataSource;
 import org.apache.commons.io.FileUtils;
-import net.lingala.zip4j.core.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
-import net.lingala.zip4j.io.ZipInputStream;
-import net.lingala.zip4j.model.FileHeader;
-import net.lingala.zip4j.model.ZipParameters;
-import net.lingala.zip4j.util.Zip4jConstants;
-import org.apache.commons.io.FileUtils;
-import org.apache.sanselan.Sanselan;
-import org.jvnet.staxex.StreamingDataHandler;
 import org.sola.common.messaging.ClientMessage;
 import org.sola.common.messaging.MessageUtility;
 import org.sola.common.messaging.ServiceMessage;
@@ -69,18 +52,17 @@ import org.sola.common.messaging.ServiceMessage;
  */
 public class FileUtility {
 
-    public final static String csv = "csv";
+    public final static String CSV = "csv";
     // Ticket #397 - use !! to delimit the location of path separators as an
     // alternative to the default ;. This is because SOLA uses ; as a special
     // path separator character when dealing with NetworkFolder. 
-    public final static String alternatePathSeparator = "!!";
-    private static long maxCacheSizeBytes = 200 * 1024 * 1024;
-    private static long resizedCacheSizeBytes = 120 * 1024 * 1024;
+    public final static String ALTERNATE_PATH_SEPARATOR = "!!";
+    private static long maxCacheSizeBytes = 200L * 1024 * 1024;
+    private static long resizedCacheSizeBytes = 120L * 1024 * 1024;
     private static int minNumberCachedFiles = 10;
-    private static long maxFileSizeBytes = 100 * 1024 * 1024;
+    private static long maxFileSizeBytes = 100L * 1024 * 1024;
     private static String cachePath = System.getProperty("user.home") + "/sola/cache/documents/";
-    private static final int BUFF_SIZE = 4096;
-
+    
     /**
      * Checks the cache to ensure it won't exceed the max size cache size. If
      * the new document will cause the cache to exceed the max size, the older
@@ -366,124 +348,6 @@ public class FileUtility {
     }
 
     /**
-     * Creates thumbnail image for the given file. Returns null if format is not
-     * supported.
-     *
-     * @param filePath The full path to the file.
-     * @param width Thumbnail width.
-     * @param height Thumbnail height.
-     */
-    public static BufferedImage createImageThumbnail(String filePath, int width, int height) {
-        try {
-            File file = new File(filePath);
-
-            if (!file.exists()) {
-                return null;
-            }
-
-            Image thumbnail = null;
-            String fileExt = getFileExtension(filePath);
-
-            if (fileExt.equalsIgnoreCase("jpg") || fileExt.equalsIgnoreCase("jpeg")) {
-
-                ImageIcon tmp = new ImageIcon(filePath);
-                if (tmp == null || tmp.getIconWidth() <= 0
-                        || tmp.getIconHeight() <= 0) {
-                    return null;
-                }
-
-                ImageIcon scaled = null;
-
-                if ((tmp.getIconWidth() > width && width > 0)
-                        || (tmp.getIconHeight() > height && height > 0)) {
-                    scaled = new ImageIcon(tmp.getImage().getScaledInstance(
-                            width, height, Image.SCALE_SMOOTH));
-                } else {
-                    scaled = tmp;
-                }
-
-                BufferedImage buffered = new BufferedImage(
-                        scaled.getIconWidth(),
-                        scaled.getIconHeight(),
-                        BufferedImage.TYPE_INT_RGB);
-                Graphics2D g = buffered.createGraphics();
-                g.drawImage(scaled.getImage(), 0, 0, null);
-                g.dispose();
-
-                return buffered;
-
-            } else {
-
-                if (fileExt.equalsIgnoreCase("pdf")) {
-
-                    RandomAccessFile raf = new RandomAccessFile(file, "r");
-                    FileChannel channel = raf.getChannel();
-                    ByteBuffer buf = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
-                    PDFFile pdffile = new PDFFile(buf);
-
-                    // draw the first page to an image
-                    PDFPage page = pdffile.getPage(0);
-
-                    //generate the image
-                    //#319 Improve quality of the image preview by ensuring the whole page
-                    // is captured correctly post any rotation that may be required. 
-                    // Use a multiple of 3 to increase the image depth for better image
-                    // definition. 
-                    thumbnail = page.getImage(
-                            (int) page.getWidth() * 3,
-                            (int) page.getHeight() * 3,
-                            null, // null for the clip rectangle to ensure entire page is captured
-                            null,
-                            true, // fill background with white
-                            true // block until drawing is done
-                            );
-
-                    buf.clear();
-                    channel.close();
-                    raf.close();
-
-                } else {
-
-                    BufferedImage img = Sanselan.getBufferedImage(file);
-                    thumbnail = Toolkit.getDefaultToolkit().createImage(img.getSource());
-
-                }
-
-                if (thumbnail == null || thumbnail.getWidth(null) <= 0
-                        || thumbnail.getHeight(null) <= 0) {
-                    return null;
-                }
-
-                Image scaled = null;
-
-                if ((thumbnail.getWidth(null) > width && width > 0)
-                        || (thumbnail.getHeight(null) > height && height > 0)) {
-                    scaled = thumbnail.getScaledInstance(
-                            width, height, Image.SCALE_SMOOTH);
-                } else {
-                    scaled = thumbnail;
-                }
-
-                BufferedImage buffered = new BufferedImage(
-                        scaled.getWidth(null),
-                        scaled.getHeight(null),
-                        BufferedImage.TYPE_INT_RGB);
-                Graphics2D g = buffered.createGraphics();
-                g.drawImage(scaled, 0, 0, null);
-                g.dispose();
-
-                return buffered;
-            }
-
-        } catch (Exception e) {
-            // Most likely the a thumbnail cannot be generated for the file type. Ignore the
-            // exception and continue. 
-            System.out.println("Unable to generate thumbnail - " + e.getMessage());
-        }
-        return null;
-    }
-
-    /**
      * Removes path separator characters (i.e. / and \) from the fileName. Used
      * to ensure user input does not redirect files to an unsafe locations. Also
      * replaces the extension for any file with an executable file extension
@@ -555,64 +419,6 @@ public class FileUtility {
         return sanitizeFileName(fileName, true);
     }
 
-    /**
-     * Saves a data stream from a {@linkplain DataHandler} to the specified
-     * file. Used to allow more efficient management of large file transfers
-     * between the SOLA client(s) and the web services.
-     *
-     * <p>
-     * If the DataHandler is a {@linkplain StreamingDataHandler}, then the
-     * {@linkplain StreamingDataHandler#moveTo(java.io.File)} method is used to
-     * save the file to disk. Otherwise the InputStream from the DataHandler is
-     * written to disk using
-     * {@linkplain #writeFileToCache(java.io.InputStream, java.io.File) writeFileToCache}.</p>
-     *
-     * <p>
-     * Note that file streaming is not currently supported if Metro security is
-     * used. Refer to http://java.net/jira/browse/WSIT-1081 for details. Using
-     * Security also substantially increases the memory required to handle large
-     * files with a practical limit around 15MB to 20MB.</p>
-     *
-     * @param dataHandler The dataHandler representing the file.
-     * @param fileName The name of the file to write the DataHander stream to.
-     * If null a random file name will be generated for the stream.
-     * @return The file name used to save the file data. This may differ from
-     * the fileName passed in if the fileName was null or it included invalid
-     * characters (e.g. / \). Will return null if the dataHandler is null;
-     */
-    public static String saveFileFromStream(DataHandler dataHandler, String fileName) {
-        if (dataHandler == null) {
-            return null;
-        }
-        if (fileName == null) {
-            fileName = generateFileName();
-        } else {
-            fileName = sanitizeFileName(fileName, true);
-        }
-        String filePathName = getCachePath() + File.separator + fileName;
-        File file = new File(filePathName);
-        deleteFile(file);
-        try {
-            if (dataHandler instanceof StreamingDataHandler) {
-                StreamingDataHandler sdh = null;
-                try {
-                    sdh = (StreamingDataHandler) dataHandler;
-                    sdh.moveTo(file);
-                } finally {
-                    if (sdh != null) {
-                        sdh.close();
-                    }
-                }
-            } else {
-                writeFile(dataHandler.getInputStream(), file);
-            }
-            maintainCache(new File(getCachePath()), 0);
-        } catch (Exception ex) {
-            throw new SOLAException(ServiceMessage.GENERAL_UNEXPECTED_ERROR_DETAILS,
-                    new Object[]{"Saving file " + fileName, ex.getLocalizedMessage(), ex});
-        }
-        return fileName;
-    }
 
     /**
      * Creates a {@linkplain DataHandler} for a file located on the local file
@@ -635,17 +441,6 @@ public class FileUtility {
                     new String[]{filePathName});
         }
         return result;
-    }
-
-    /**
-     * Creates a {@linkplain DataHandler} for a byte array representing the
-     * content of a file. Also configures the MIME type to ensure the content is
-     * correctly mapped as a DataHander.
-     *
-     * @param fileContent The byte array containing the file content.
-     */
-    public static DataHandler getFileAsStream(byte[] fileContent) {
-        return new DataHandler(new ByteArrayDataSource(fileContent, "application/octet-stream"));
     }
 
     /**
@@ -728,9 +523,7 @@ public class FileUtility {
             }
             out.flush();
         } finally {
-            if (in != null) {
-                in.close();
-            }
+            in.close();
             if (out != null) {
                 out.close();
             }
@@ -748,8 +541,9 @@ public class FileUtility {
     public static byte[] readFile(File file) throws IOException {
         byte[] result = null;
         if (file != null && file.exists()) {
-            FileInputStream in = new FileInputStream(file);
+            FileInputStream in=null;
             try {
+                in = new FileInputStream(file);
                 int length = (int) file.length();
                 result = new byte[length];
                 int offset = 0;
@@ -766,7 +560,9 @@ public class FileUtility {
                             new Object[]{"File could not be read", file.getName()});
                 }
             } finally {
-                in.close();
+                if (in!=null) {
+                    in.close();
+                }
             }
         }
         return result;
@@ -834,140 +630,33 @@ public class FileUtility {
         }
     }
 
-    public static String compress(String fileName, String password) {
-        fileName = sanitizeFileName(fileName, true);
-        String inputFilePath = getCachePath() + File.separator + fileName;
-        String zipFileName = getFileNameWithoutExtension(fileName) + ".zip";
-        String outputFilePath = getCachePath() + File.separator + zipFileName;
-        try {
-            ZipFile zipFile = new ZipFile(outputFilePath);
-            File inputFile = new File(inputFilePath);
-            ZipParameters parameters = new ZipParameters();
-            parameters.setCompressionMethod(Zip4jConstants.COMP_DEFLATE);
-            parameters.setCompressionLevel(Zip4jConstants.DEFLATE_LEVEL_ULTRA);
-            parameters.setEncryptFiles(true);
-            parameters.setEncryptionMethod(Zip4jConstants.ENC_METHOD_AES);
-            parameters.setAesKeyStrength(Zip4jConstants.AES_STRENGTH_256);
-            parameters.setPassword(password);
-            zipFile.addFile(inputFile, parameters);
-            return zipFileName;
-        } catch (ZipException ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public static String compress(String archiveFileName, ArrayList<String> fileNamesToAdd, String password) {
-        String zipFileName = getFileNameWithoutExtension(archiveFileName) + ".zip";
-        String outputFilePath = getCachePath() + File.separator + zipFileName;
-        try {
-            ArrayList filesToAdd = new ArrayList();
-            for (String fileNameToAdd : fileNamesToAdd) {
-                filesToAdd.add(new File(fileNameToAdd));
-            }
-            File currentArchive = new File(outputFilePath);
-            if (currentArchive.exists()){
-                FileUtils.deleteQuietly(currentArchive);
-            }
-            ZipFile zipFile = new ZipFile(outputFilePath);
-            ZipParameters parameters = new ZipParameters();
-            parameters.setCompressionMethod(Zip4jConstants.COMP_DEFLATE);
-            parameters.setCompressionLevel(Zip4jConstants.DEFLATE_LEVEL_ULTRA);
-            parameters.setEncryptFiles(true);
-            parameters.setEncryptionMethod(Zip4jConstants.ENC_METHOD_AES);
-            parameters.setAesKeyStrength(Zip4jConstants.AES_STRENGTH_256);
-            parameters.setPassword(password);
-            zipFile.addFiles(filesToAdd, parameters);
-            return zipFileName;
-        } catch (ZipException ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public static String uncompress(String fileName, String password) throws ZipException {
-        fileName = sanitizeFileName(fileName, true);
-        //Full path of the file that is compressed
-        String inputFilePath = getCachePath() + File.separator + fileName;
-        String destinationPath = getCachePath();
-        ZipFile zipFile = new ZipFile(inputFilePath);
-        if (zipFile.isEncrypted()) {
-            zipFile.setPassword(password);
-        }
-        FileHeader fileHeader = (FileHeader) zipFile.getFileHeaders().get(0);
-        String fileUncompressed = fileHeader.getFileName();
-        zipFile.extractAll(destinationPath);
-        return fileUncompressed;
-    }
-
-    public static String uncompress(String folderDestination, String archiveFileName, String password) throws ZipException {
-       return uncompress(archiveFileName, password);
-    }
-
-
-    public static ZipFile getArchiveFile(String archiveFileName, String password)
-            throws ZipException {
-        archiveFileName = sanitizeFileName(archiveFileName, true);
-        //Full path of the file that is compressed
-        String inputFilePath = getCachePath() + File.separator + archiveFileName;
-        ZipFile zipFile = new ZipFile(inputFilePath);
-        if (zipFile.isEncrypted()) {
-            zipFile.setPassword(password);
-        }
-        return zipFile;
-    }
-
-    public static byte[] getArchiveFileContent(ZipFile zipFile, FileHeader fileHeader)
-            throws IOException {
-        ZipInputStream inputStream = null;
-        ByteArrayOutputStream outputStream = null;
-        try {
-            inputStream = zipFile.getInputStream(fileHeader);
-            int bytesToRead;
-            byte[] buffer = new byte[BUFF_SIZE];
-            outputStream = new ByteArrayOutputStream();
-            while ((bytesToRead = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesToRead);
-            }
-            return outputStream.toByteArray();
-        } catch (ZipException ex) {
-            throw new RuntimeException(ex);
-        } finally {
-            if (inputStream != null) {
-                inputStream.close();
-            }
-            if (outputStream != null) {
-                outputStream.close();
-            }
-        }
-    }
-
-
-
     /**
      * Formats file size, applying KB, MB, GB units.
+     *
      * @param size Size to format
-     * @return 
+     * @return
      */
-    public static String formatFileSize(long size){
-        if(size == 0){
+    public static String formatFileSize(long size) {
+        if (size == 0) {
             return "0";
         }
-        
-        if(size < 1024){
+
+        if (size < 1024) {
             return size + "B";
         }
-        
-        if(size >= 1024 && size < 1048576){
-            return Math.round((size/1024)*100.0)/100.0 + "KB";
+
+        if (size >= 1024 && size < 1048576) {
+            return Math.round((size / 1024) * 100.0) / 100.0 + "KB";
         }
-        
-        if(size >= 1048576 && size < 1073741824){
-            return Math.round((size/1024/1024)*100.0)/100.0 + "MB";
+
+        if (size >= 1048576 && size < 1073741824) {
+            return Math.round((size / 1024 / 1024) * 100.0) / 100.0 + "MB";
         }
-        
-        if(size >= 1073741824 && size < 1099511627776L){
-            return Math.round((size/1024/1024/1024)*100.0)/100.0 + "GB";
+
+        if (size >= 1073741824 && size < 1099511627776L) {
+            return Math.round((size / 1024 / 1024 / 1024) * 100.0) / 100.0 + "GB";
         }
-        
-        return Math.round((size/1024/1024/1024/1024)*100.0)/100.0 + "TB";
+
+        return Math.round((size / 1024 / 1024 / 1024 / 1024) * 100.0) / 100.0 + "TB";
     }
 }

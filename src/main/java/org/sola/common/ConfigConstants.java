@@ -396,6 +396,9 @@ public class ConfigConstants {
     /** Indicates whether Community Server is connected to the Internet or not. 0 - connected, 1 - not connected. */
     public static final String OT_OFFLINE_MODE = "offline-mode";
     
+    /** Relative or absolute path to the reports folder. */
+    public static final String REPORTS_FOLDER_PATH = "reports-folder-path";
+            
     /** Full path to PostgreSQL utilities (bin) folder (e.g. C:\Program Files\PostgreSQL\9.1\bin). Used for backup/restore implementation of SOLA Web admin application */
     public static final String DB_UTILITIES_FOLDER = "db-utilities-folder";
     
